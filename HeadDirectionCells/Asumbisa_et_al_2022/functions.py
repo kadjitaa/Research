@@ -20,52 +20,8 @@ from itertools import combinations
 from pycircstat.descriptive import mean as circmean2
 import astropy
 
-'''
-Utilities functions
-Feel free to add your own
-'''
 
 
-def refineSleepFromAccel(acceleration, sleep_ep):
-	vl = acceleration[0].restrict(sleep_ep)
-	vl = vl.as_series().diff().abs().dropna()	
-	a, _ = scipy.signal.find_peaks(vl, 0.025)
-	peaks = nts.Tsd(vl.iloc[a])
-	duration = np.diff(peaks.as_units('s').index.values)
-	interval = nts.IntervalSet(start = peaks.index.values[0:-1], end = peaks.index.values[1:])
-
-	newsleep_ep = interval.iloc[duration>15.0]
-	newsleep_ep = newsleep_ep.reset_index(drop=True)
-	newsleep_ep = newsleep_ep.merge_close_intervals(100000, time_units ='us')
-
-	#newsleep_ep	= sleep_ep.intersect(newsleep_ep)
-
-	return newsleep_ep
-
-
-
-
-#########################################################
-# CORRELATION
-#########################################################
-# @jit(nopython=True)
-
-def pairs(tcurves):
-    '''generates cell pairs based on angular difference in ascending order
-    The input to the function is a dataframe of tuning curves'''
-    
-    pf=pd.DataFrame(index=[0],columns=tcurves.columns)
-    for i in tcurves.columns:
-        pf[i]=tcurves[i].idxmax()
-        
-    cells=list(combinations(tcurves.columns,2))
-    ang_diff=pd.DataFrame(index=[0],columns=cells)
-    for i,x in ang_diff.columns:
-        unwrap_diff=pf[i].values-pf[x].values
-        ang_diff[(i,x)]=abs(np.arctan2(np.sin(unwrap_diff),np.cos(unwrap_diff)))
-
-    cell_pairs=ang_diff.T.sort_values(by=[0]).index
-    return cell_pairs
 
 def qwik_cc(cell_a,cell_b, spikes, ep):
     t1=spikes[cell_a].restrict(ep).as_units('ms')
@@ -220,47 +176,6 @@ def compute_AutoCorrs(spks, ep,hdIdx, binsize = 5, nbins = 400):
     autocorrs.loc[0] = 0.0
     return autocorrs, firing_rates
 
-def compute_ISI(spks, ep, maxisi, nbins, log_=False):
-	"""
-	"""
-	neurons = list(spks.keys())
-	if log_:
-		bins = np.linspace(np.log10(1), np.log10(maxisi), nbins)
-	else:
-		bins = np.linspace(0, maxisi, nbins)
-		
-	isi = pd.DataFrame(index =  bins[0:-1] + np.diff(bins)/2, columns = neurons)
-	for i in neurons:
-		tmp = []
-		for j in ep.index:
-			tmp.append(np.diff(spks[i].restrict(ep.loc[[j]]).as_units('ms').index.values))
-		tmp = np.hstack(tmp)
-		if log_:
-			isi[i], _ = np.histogram(np.log10(tmp), bins)
-		else:
-			isi[i], _ = np.histogram(tmp, bins)
-
-	return isi
-
-
-
-
-
-def butter_bandpass(lowcut, highcut, fs, order=5):
-	from scipy.signal import butter
-	nyq = 0.5 * fs
-	low = lowcut / nyq
-	high = highcut / nyq
-	b, a = butter(order, [low, high], btype='band')
-	return b, a
-
-def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
-	from scipy.signal import lfilter
-	b, a = butter_bandpass(lowcut, highcut, fs, order=order)
-	y = lfilter(b, a, data)
-	return y
-
-
 
 
 #########################################################
@@ -311,11 +226,9 @@ def computeFiringRates(spikes, epochs, tcs,name,hds):
         for i,k in enumerate(hds):
             mean_frate.loc[i,n] = len(spikes[k].restrict(ep))/ep.tot_length('s') 
             peak_frate.loc[i,n]=tc[k].max()
-            pfd.loc[i,n]=tc[k].idxmax(axis=0)
-            #tcs=computeAngularTuningCurves(spikes, position['ry'], ep)
-            #peak_frate.loc[i,n] =tcs[k].max()
-            #pfd.loc[i,n]=tcs[k].idxmax(axis=0)      
+            pfd.loc[i,n]=tc[k].idxmax(axis=0)  
     return mean_frate, peak_frate, pfd
+
 
 def computeVectorLength(spikes,epochs,position, name,hds):
     rmean=pd.DataFrame(index = np.arange(len(hds)), columns = name)
@@ -348,7 +261,6 @@ def MutualInfo(spikes,ep,position,hds):
     I=pd.DataFrame(index=hds,columns=[0])
     for k in hds: 
         lamda_i=computeAngularTuningCurves(spikes,position,ep,60)[k].values
-        #bins=computeAngularTuningCurves(spikes,position['ry'],ep,60)[i].index
         lamda=len(spikes[k].restrict(ep))/ep.tot_length('s') 
         pos=position.restrict(ep)
         bins=linspace(0,2*pi,60)
@@ -357,6 +269,7 @@ def MutualInfo(spikes,ep,position,hds):
         bits_spk=sum(occu*(lamda_i/lamda)*np.log2(lamda_i/lamda))
         I.loc[k,0]=bits_spk
     return I      
+
 
 
 def computeAngularTuningCurves(spikes, angle, ep,nb_bins = 180, frequency = 120.0):
@@ -391,62 +304,6 @@ def computeAngularTuningCurves(spikes, angle, ep,nb_bins = 180, frequency = 120.
 
 
 
-
-
-def computeAngularTuningCurves2(spikes, angle, ep, hds,nb_bins = 180, frequency = 120.0):
-
-    bins             = np.linspace(0, 2*np.pi, nb_bins)
-    idx             = bins[0:-1]+np.diff(bins)/2
-    tuning_curves     = pd.DataFrame(index = idx, columns = hds)    
-    angle             = angle.restrict(ep)
-    # Smoothing the angle here
-    tmp             = pd.Series(index = angle.index.values, data = np.unwrap(angle.values))
-    tmp2             = tmp.rolling(window=50,win_type='gaussian',center=True,min_periods=1).mean(std=10.0)
-    angle            = nts.Tsd(tmp2%(2*np.pi))
-    for k in hds:
-        spks             = spikes[k]
-        # true_ep         = nts.IntervalSet(start = np.maximum(angle.index[0], spks.index[0]), end = np.minimum(angle.index[-1], spks.index[-1]))        
-        spks             = spks.restrict(ep)    
-        angle_spike     = angle.restrict(ep).realign(spks)
-        spike_count, bin_edges = np.histogram(angle_spike, bins)
-        occupancy, _     = np.histogram(angle, bins)
-        spike_count     = spike_count/occupancy        
-        tuning_curves[k] = spike_count*frequency    
-    
-        tcurves = tuning_curves[k]
-        padded     = pd.Series(index = np.hstack((tcurves.index.values-(2*np.pi),
-                                                tcurves.index.values,
-                                                tcurves.index.values+(2*np.pi))),
-                            data = np.hstack((tcurves.values, tcurves.values, tcurves.values)))
-        smoothed = padded.rolling(window=20,win_type='gaussian',center=True,min_periods=1).mean(std=3.0)        
-        tuning_curves[k] = smoothed[tcurves.index]
-
-    return tuning_curves
-
-
-def computeFrateAng(spikes, angle, ep, nb_bins = 180, frequency = 120.0):
-    '''Computes the ang tcurves without normalising to occupancy.
-    It will essentiall give you the total spike count for each angular position
-    '''
-
-    bins             = np.linspace(0, 2*np.pi, nb_bins)
-    idx             = bins[0:-1]+np.diff(bins)/2
-    tuning_curves     = pd.DataFrame(index = idx, columns = np.arange(len(spikes)))    
-    angle             = angle.restrict(ep)
-    # Smoothing the angle here
-    tmp             = pd.Series(index = angle.index.values, data = np.unwrap(angle.values))
-    tmp2             = tmp.rolling(window=50,win_type='gaussian',center=True,min_periods=1).mean(std=10.0)
-    angle            = nts.Tsd(tmp2%(2*np.pi))
-    for k in spikes:
-        spks             = spikes[k]
-        # true_ep         = nts.IntervalSet(start = np.maximum(angle.index[0], spks.index[0]), end = np.minimum(angle.index[-1], spks.index[-1]))        
-        spks             = spks.restrict(ep)    
-        angle_spike     = angle.restrict(ep).realign(spks)
-        spike_count, bin_edges = np.histogram(angle_spike, bins)
-        occupancy, _     = np.histogram(angle, bins)
-        tuning_curves[k] = spike_count    
-
-    return tuning_curves
 
 def computeInfo(eps,spikes,position, name,hds):
     I=pd.DataFrame(index=np.arange(len(hds)),columns=name)
@@ -539,30 +396,6 @@ def findHDCells_GV(tuning_curves, z = 50, p = 0.0001 , m = 1):
 
 
 
-def findHDCells_KA(tuning_curves,pos,ep,spikes, z = 35, corr=0.4, p = 0.0001 , m = 1):
-    cond1 = tuning_curves.max()>m
-    stat = pd.DataFrame(index = tuning_curves.columns, columns = ['pval', 'z','r'])
-    ep1_start=ep.start[0]; ep1_end=ep.start[0]+(diff(ep)[0][0]/2)
-    
-    ep2_start=ep1_end; ep2_end=ep.end[0]
-    
-    ep1=nts.IntervalSet(ep1_start,ep1_end)
-    ep2=nts.IntervalSet(ep2_start,ep2_end)
-    tcurve1=computeAngularTuningCurves(spikes,pos,ep1,60)
-    tcurve2=computeAngularTuningCurves(spikes,pos,ep2,60)
-    from pycircstat.tests import rayleigh
-    from astropy.stats import circcorrcoef
-
-    for k in tuning_curves.columns:
-        stat.loc[k,['pval','z']] = rayleigh(tuning_curves[k].index.values, tuning_curves[k].values)
-        stat.loc[k,'r']=circcorrcoef(tcurve2[k].replace(nan,0).values,tcurve1[k].replace(nan,0).values)
-
-    cond2 = np.logical_and(stat['pval']<p,stat['z']>z)
-    cond3 = abs(stat['r'])>=corr
-    #tokeep = stat.index.values[np.where(np.logical_and(cond1, cond2))[0]]
-    tokeep =np.where(cond1&cond2&cond3)
-    return tokeep, stat
-
 
 def findHDCells(tuning_curves,ep,spikes,position,cut_off=0.49):
     """
@@ -623,7 +456,6 @@ def findHDCells(tuning_curves,ep,spikes,position,cut_off=0.49):
     stat['hd_info']=I'''
   
     return stat
-# np.where(cond3)[0] to get the index of the true statements
     
 def decodeHD(tuning_curves, spikes, ep,bin_size = 200, px = None):
     """
@@ -864,24 +696,6 @@ def PFD(tcurve, ep,spikes): #duration must be in microsecs
         
     return  max_tcurves
 
-  
-    
-    
-def pcorrcoef(x, y, deg=False, test=True):
-    '''Circular correlation coefficient of two angle data(default to degree)
-    Set `test=True` to perform a significance test.
-    '''
-    convert = np.pi / 180.0 if deg else 1
-    sx = np.frompyfunc(np.sin, 1, 1)((x - mean(x)) * convert)
-    sy = np.frompyfunc(np.sin, 1, 1)((y - mean(y)) * convert)
-    r = (sx * sy).sum() / np.sqrt((sx ** 2).sum() * (sy ** 2).sum())
-
-    if test:
-        l20, l02, l22 = (sx ** 2).sum(),(sy ** 2).sum(), ((sx ** 2) * (sy ** 2)).sum()
-        test_stat = r * np.sqrt(l20 * l02 / l22)
-        p_value = 2 * (1 - scipy.stats.norm.cdf(abs(test_stat)))
-      
-    return r,p_value 
 
 
       
@@ -903,8 +717,6 @@ def computeCircularStats(epochs,spikes,position, names,hds):
     return circ_mean,circ_var
 
 
-
-
 def shuffleByIntervalSpikes(spikes, epochs):
 	shuffled = {}
 	for n in spikes.keys():
@@ -918,32 +730,6 @@ def shuffleByIntervalSpikes(spikes, epochs):
 	return shuffled
 
 
-
-
-
-#Stability
-def stability(ep,spikes,pos):
-    #dur= diff(ep)/2
-     #duration must be in microsecs
-    #ep=slidingWinEp(ep,dur)  
-    '''TO DO
-    modify the line above to accept arrays with multiple eps'''
-    r=pd.DataFrame(index=spikes.keys(), columns=['spatial_corr','pval_corr'])
-    ep1_start=ep.start[0]; ep1_end=ep.start[0]+(diff(ep)[0][0]/2)
-            
-    ep2_start=ep1_end; ep2_end=ep.end[0]
-    
-    ep1=nts.IntervalSet(ep1_start,ep1_end)
-    ep2=nts.IntervalSet(ep2_start,ep2_end)
-    tcurve1=computeAngularTuningCurves(spikes,pos,ep1,60)
-    tcurve2=computeAngularTuningCurves(spikes,pos,ep2,60)
-    
-    for k in spikes.keys():
-        r.loc[k,'spatial_corr']=astropy.stats.circcorrcoef(tcurve1[k].replace(nan,0).values,tcurve2[k].replace(nan,0).values)
-        #r.loc[k,'spatial_corr']=scipy.stats.pearsonr(tcurve1[k].replace(nan,0).values,tcurve2[k].replace(nan,0).values)[0]
-        #r.loc[k,'pval_corr']=scipy.stats.pearsonr(tcurve1[k].replace(nan,0).values,tcurve2[k].replace(nan,0).values)[1]
-    return r
-    
 
 
 def computeStability_KA(epochs,spikes,position,name,hds): #computes spatial corr for several datafiles
@@ -970,45 +756,6 @@ def computeStability_KA(epochs,spikes,position,name,hds): #computes spatial corr
                 r.loc[i,n]=scipy.stats.pearsonr(tc.iloc[:,0],tc.iloc[:,1])[0]
     return r
 
-
-
-
-def sessionStability(epochs,spikes,position,name,hds): #computes spatial corr for several datafiles
-    r=pd.DataFrame(index=[0], columns=name)
-    if len(hds)<2:
-        r.iloc[0,0]=np.nan
-        
-    else:
-    
-        for n, ep in zip(name,epochs): 
-            dur= diff(ep)/2
-             #duration must be in microsecs  
-            ep1_start=ep.start[0]; ep1_end=ep.start[0]+(diff(ep)[0][0]/2)
-            
-            ep2_start=ep1_end; ep2_end=ep.end[0]
-            
-            ep1=nts.IntervalSet(ep1_start,ep1_end)
-            ep2=nts.IntervalSet(ep2_start,ep2_end)
-        
-            tcurve1=computeAngularTuningCurves(spikes,position,ep1,60)
-            tcurve2=computeAngularTuningCurves(spikes,position,ep2,60)
-           
-            cCorrs=pd.DataFrame(index=np.arange(len(hds)),columns=['1','2'])
-            for i,k in enumerate(hds):
-                tc=pd.DataFrame([tcurve1[k],tcurve2[k]]).T
-                tc=tc.dropna()
-                tc1_mean=scipy.stats.circmean(tc.iloc[:,0])
-                tc2_mean=scipy.stats.circmean(tc.iloc[:,1])
-                
-                # tc1_mean=scipy.stats.circmean(tcurve1[k].dropna())
-                # tc2_mean=scipy.stats.circmean(tcurve2[k].dropna())
-                cCorrs.iloc[i,:]=[tc1_mean,tc2_mean]
-            
-            cCorrs=cCorrs.dropna()
-            cCorrs=np.unwrap(cCorrs)
-                
-            r.loc[0,n]=scipy.stats.pearsonr(cCorrs[:,0],cCorrs[:,1])[0] 
-    return r
 
 
         
@@ -1184,7 +931,7 @@ def full_ang2(ep,start_ep,position):
     return full_ang_ep
 
 
-def makeRingManifold(spikes, ep, angle, hds,neighbors=20,bin_size = 200):
+def makeRingManifold(spikes, ep, angle, hds,neighbors=50,bin_size = 200):
     """
     spikes : dict of hd spikes
     ep : epoch to restrict
@@ -1222,191 +969,8 @@ def makeRingManifold(spikes, ep, angle, hds,neighbors=20,bin_size = 200):
     imap = Isomap(n_neighbors = neighbors, n_components = 2, n_jobs = -1).fit_transform(inputs)    
 
     H = newangle.values/(2*np.pi)
-    # HSV = np.vstack((H, np.ones_like(H), np.ones_like(H))).T
-    # RGB = hsv_to_rgb(HSV)
-        
-    # fig,ax=subplots(figsize=(5.1,4.7))
-    # ax = subplot(111)
-    # ax.set_aspect(aspect=1)
-    # ax.scatter(imap[:,0], imap[:,1], c = RGB, marker = 'o', alpha = 0.5, zorder = 2, linewidth = 0, s= 40)    
-      
-    # '''# hsv
-    # display_axes = fig.add_axes([0.2,0.25,0.05,0.1], projection='polar')
-    # colormap = plt.get_cmap('hsv')
-    # norm = mpl.colors.Normalize(0.0, 2*np.pi)
-    # xval = np.arange(0, 2*pi, 0.01)
-    # yval = np.ones_like(xval)
-    # display_axes.scatter(xval, yval, c=xval, s=20, cmap=colormap, norm=norm, linewidths=0, alpha = 0.8)
-    # display_axes.set_yticks([])
-    # display_axes.set_xticks(np.arange(0, 2*np.pi, np.pi/2))
-    # display_axes.grid(False)
-    # '''
-    # show()
-    
-    # ax.axis('on')
-
     
     return imap, H,bins[0:-1]+np.diff(bins)/2
-    
-def processed_files(animal_id,date):
-    'input to the function must be a strings'
-    
-    data_dir='D:/EphysData/Experiments/'+ date+'/'+animal_id+'-'+date+'/'+animal_id+'-'+date+'/Analysis'
-    dir='D:/EphysData/Experiments/'+ date+'/'+animal_id+'-'+date+'/'+animal_id+'-'+date
-    epochs=nts.IntervalSet(pd.read_hdf(data_dir+'/BehavEpochs.H5'))
-    position=pd.read_hdf(data_dir+'/'+'Position.H5')
-    position = nts.TsdFrame(t = position.index.values, d = position.values, columns = position.columns, time_units = 's')
-    spikes,shank= loadSpikeData(dir) #shank tells the number of cells on each shank
-
-    tcurv={}
-    for i in range(len(epochs)):
-        tcurv[i]=computeAngularTuningCurves(spikes,position ['ry'],nts.IntervalSet(epochs.loc[i,'start'],epochs.loc[i,'end']),60)
-    'tuning curves are computed based on entire epoch, to restrict it, just modify the end time above'
-    #load tuning curve
-    #np.load(dir+'/'+animal_id+'.npy').item()
-    
-    np.save(os.path.join(data_dir, animal_id), tcurv)  
-    return spikes, epochs, position, tcurv   
-
-def explore(eps, position):
-    '''The function takes nts.TsdFrame of position from neuroseries and outputs total distance 
-    traveled,distribution of distance traveled per frame and speed''' 
-    
-    expl=pd.DataFrame(index=range(len(eps)),columns=('tot_dist','speed'))
-    for i in range(len(eps)):
-        ep=nts.IntervalSet(start=eps.iloc[i,0],end=eps.iloc[i,1])
-    
-        pos_x=position['x'].restrict(ep)
-        pos_y=position['z'].restrict(ep)
-        
-        x=array(pd.DataFrame(pos_x.values))
-        y=array(pd.DataFrame(pos_y.values))
-        
-        dx = x[1:]-x[:-1]
-        dy = y[1:]-y[:-1]
-        step_size = np.sqrt(dx**2+dy**2)#this must be used for computing the speed
-        #step_size=np.concatenate(([[0]],step_size)) #new modification
-        #dist = np.concatenate(([0], np.cumsum(step_size)))
-        dist=sum(step_size)
-        tot_dist=dist*100
-        #tot_dist=dist[-1]*100 #converts to cm
-        motion_frames=len(step_size[step_size>0])/120 #index only frames that the animal actually moved in secs
-        speed=tot_dist/motion_frames        
-        expl.iloc[i,0]=tot_dist
-        expl.iloc[i,1]=speed
-    return expl,step_size
-'''
-def explore_Center_Perimeter(eps,position, perArea=0.33):
-    
-    center_peri=pd.DataFrame(index=range(len(eps)),columns=('tot_dist','avg_speed','center_dist', 'perimeter_dist', 'center_speed','perimeter_speed'))
-    for i in range(len(eps)):
-        ep=nts.IntervalSet(start=eps.iloc[i,0],end=eps.iloc[i,1])
-    
-        pos=pd.DataFrame(index=(range(len(position.restrict(ep)))),columns=['x','z'])
-        pos['x']=position['x'].restrict(ep).values
-        pos['z']=position['z'].restrict(ep).values
-        
-        x_cen=(pos['x'].max()+pos['x'].min())/2
-        y_cen=(pos['z'].max()+pos['z'].min())/2
-        center=[x_cen,y_cen]
-        
-        tot_exp,dist=explore(ep,position)
-        center_peri.loc[i,('tot_dist','avg_speed')]=tot_exp.values
-        
-        r=np.sqrt((pos['x']-x_cen)**2+(pos['z']-y_cen)**2) #len of the radius at all points
-        cyl_r= r.max() #the radius of the area explored                   meters 56.2cm--cylinder size
-        cyl_c=cyl_r-(perArea*cyl_r) #1/2of the cylinder 10cm from per
-        
-        #Center
-        cen=dist[r[0:-1]< cyl_c]
-       
-        dist_c=sum(cen)*100
-        dist_c_1=sum(cen) #bcos dis has already been converted to cms in the explore fxn
-        vels_all_c=(cen*100)*120   #120 is the cam sampling freq, 100 brings the units to cm ####MUST DIVIDE NOT MULTIPLY!
-        vel_c=dist_c/(len(cen)/120)
-        
-        #Wall
-        wall=dist[r[0:-1]>=cyl_c]
-        dist_w=sum(wall)*100
-        vels_all_w=(wall*100)*120  
-        vel_w=dist_w/(len(wall)/120)
-    
-        #Distance
-        center_peri.loc[i,'center_dist']= dist_c
-        center_peri.loc[i,'perimeter_dist']= dist_w        
-      
-        #Velocity
-        center_peri.loc[i,'center_speed']= vel_c
-        center_peri.loc[i,'perimeter_speed']= vel_w      
-    return center_peri
-'''
-def explore_Center_Perimeter(eps,position,mouse_id,perArea=0.33):
-    
-    center_peri=pd.DataFrame(index=[mouse_id],columns=('tot_dist (m)','avg_speed (m/s)','center_dist (m)'\
-                                                            ,'perimeter_dist (m)', 'center_speed (m/s)','perimeter_speed (m/s)'))
-        
-    dist_from_cen={}
-    
-    
-    for i in range(len(eps)):
-        ep=nts.IntervalSet(start=eps.iloc[i,0],end=eps.iloc[i,1])
-    
-        pos=pd.DataFrame(index=(range(len(position.restrict(ep)))),columns=['x','z'])
-        
-        #converts to cm
-        x=array(position['x'].restrict(ep).values)
-        y=array(position['z'].restrict(ep).values)
-        
-        dx = x[1:]-x[:-1]
-        dy = y[1:]-y[:-1]
-        
-        #convert step size to cm
-        step_size = np.sqrt(dx**2+dy**2) #this must be used for computing the speed
-
-        tot_dist=sum(step_size)
-        
-        motion_frames=len(step_size[step_size>0])/120 #index only frames that the animal actually moved in secs
-        avg_speed=tot_dist/motion_frames 
-
-
-        #Center
-        x_cen=(x.max()+x.min())/2
-        y_cen=(y.max()+y.min())/2
-        center=[x_cen,y_cen]
-        
-        #tot_exp,dist=explore(ep,position)
-        center_peri.loc[i,('tot_dist (m)','avg_speed (m/s)')]=[tot_dist,avg_speed]
-        
-        r=np.sqrt((x-x_cen)**2+(y-y_cen)**2) #len of the radius at all points
-        dist_from_cen[mouse_id]=r
-        
-        
-        
-        cyl_r= r.max() #the radius of the area explored                   meters 56.2cm--cylinder size
-        cyl_c=cyl_r-(perArea*cyl_r) #1/2of the cylinder 10cm from per
-        
-        #Center
-        cen=step_size[r[0:-1]< cyl_c]
-        cen_motion_frames=len(cen[cen>0])/120
-        dist_c=sum(cen)
-        #vels_all_c=cen*120   #120 is the cam sampling freq, 100 brings the units to cm ####MUST DIVIDE NOT MULTIPLY!
-        vel_c=dist_c/cen_motion_frames
-        
-        #Wall
-        wall=step_size[r[0:-1]>=cyl_c]
-        wall_motion_frames=len(wall[wall>0])/120
-        dist_w=sum(wall)
-        #vels_all_w=(wall*100)*120  
-        vel_w=dist_w/wall_motion_frames
-
-        #Distance
-        center_peri.loc[i,'center_dist (m)']= dist_c
-        center_peri.loc[i,'perimeter_dist (m)']= dist_w        
-      
-        #Speed
-        center_peri.loc[i,'center_speed (m/s)']= vel_c
-        center_peri.loc[i,'perimeter_speed (m/s)']= vel_w      
-    return center_peri,dist_from_cen
 
 
 
@@ -1503,6 +1067,7 @@ ani = animation.FuncAnimation(fig, update, len(x), fargs=[x, y, line],
 
 
 def bkgrid ():
+    '''Helper fxn for making grids in matplotlib during figure making'''
     plt.gcf()
     pad=0.05
     ax=gcf().add_axes([pad,pad,1-(2*pad),1-(2*pad)])
@@ -1679,34 +1244,6 @@ def rose_plot(ax, angles, bins=16, density=None, offset=0, lab_unit="degrees",
                   r'$\pi$', r'$5\pi/4$', r'$3\pi/2$', r'$7\pi/4$']
         ax.set_xticklabels(label)
         
-def makeODTarena(l=1.3):
-
-    gca().plot([17,17],[9,240],color='k',zorder=3,linewidth=l)
-    gca().plot([238,238],[9,95],color='k',zorder=3,linewidth=l)
-    gca().plot([238,238],[150,240],color='k',zorder=3,linewidth=l)
-
-    gca().plot([17,238],[9,9],color='k',zorder=3,linewidth=l)
-    gca().plot([17,238],[240,240],color='k',zorder=3,linewidth=l)
-
-
-    gca().plot([270,270],[9,95],color='k',zorder=3,linewidth=l)
-    gca().plot([270,270],[150,240],color='k',zorder=3,linewidth=l)
-
-    gca().plot([485,485],[9,240],color='k',zorder=3,linewidth=l)
-    gca().plot([270,485],[9,9],color='k',zorder=3,linewidth=l)
-    gca().plot([270,485],[240,240],color='k',zorder=3,linewidth=l)
-
-    gca().plot([238,270],[95,95],color='k',linewidth=l)
-    gca().plot([238,270],[150,150],color='k',linewidth=l)
-
-
-    avers=gca().scatter(298,120,s=100, facecolors='red',edgecolors='k',linewidth=1,zorder=3)
-    avers1=gca().scatter(436,120,s=100, facecolors='red',edgecolors='k',linewidth=1,zorder=3)
-
-    neut=gca().scatter(210,120,s=100, facecolors='white', edgecolors='k',linewidth=1,zorder=3 )
-    neut1=gca().scatter(68,120,s=100, facecolors='white', edgecolors='k',linewidth=1,zorder=3 )
-    gca().axis('off')
-    return  neut,avers
 
 
 def angularDiff(ang_pair,ang_dir):
@@ -1742,6 +1279,17 @@ def predAng(circ_mean,cond3):
 
     return data
 
+
+def makeBettiFromRing(spk_iso):
+    barcodes = tda(spk_iso, maxdim=1, coeff=2)['dgms']
+    h1 = barcodes[1]
+    
+    betti_x=h1[:,0] #birth 
+    betti_x1=h1[:,1] #death
+    
+    r=max(abs(betti_x1-betti_x)) #the longest radius
+    
+    return betti_x, betti_x1, r
 
 
 
