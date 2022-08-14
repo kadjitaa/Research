@@ -1319,4 +1319,22 @@ def computeAngularVelocity2(angle, time_bins, ep):
     index      = np.digitize(tmp2.as_units('ms').index, time_bins)
     tmp3       = tmp2.as_series().groupby(index).mean().reset_index(drop=True)
     tmp4       = np.diff(tmp3.values)/np.diff(time_bins*1e-3)[0]# converts to seconds
-    return tmp4        
+    return tmp4 
+
+    
+    
+def pcorrcoef(x, y, deg=False, test=True):
+    '''Circular correlation coefficient of two angle data(default to degree)
+    Set `test=True` to perform a significance test.
+    '''
+    convert = np.pi / 180.0 if deg else 1
+    sx = np.frompyfunc(np.sin, 1, 1)((x - mean(x)) * convert)
+    sy = np.frompyfunc(np.sin, 1, 1)((y - mean(y)) * convert)
+    r = (sx * sy).sum() / np.sqrt((sx ** 2).sum() * (sy ** 2).sum())
+
+    if test:
+        l20, l02, l22 = (sx ** 2).sum(),(sy ** 2).sum(), ((sx ** 2) * (sy ** 2)).sum()
+        test_stat = r * np.sqrt(l20 * l02 / l22)
+        p_value = 2 * (1 - scipy.stats.norm.cdf(abs(test_stat)))
+      
+    return r,p_value        
