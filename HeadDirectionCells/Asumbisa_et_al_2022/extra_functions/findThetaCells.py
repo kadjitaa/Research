@@ -4,7 +4,6 @@ Created on Thu Mar  3 22:09:31 2022
 
 @author: kasum
 """
-#Note: hdIdx here is same as cell ids, but in my case i only looked at HD cells hence that variable name
 import numpy as np
 from numba import jit
 import pandas as pd
@@ -20,6 +19,7 @@ from scipy.ndimage import gaussian_filter
 from itertools import combinations
 from pycircstat.descriptive import mean as circmean2
 import astropy
+
 
 
 def compute_AutoCorrs(spks, ep,hdIdx, binsize = 5, nbins = 400):
@@ -43,6 +43,7 @@ def compute_AutoCorrs(spks, ep,hdIdx, binsize = 5, nbins = 400):
     # And don't forget to replace the 0 ms for 0
     autocorrs.loc[0] = 0.0
     return autocorrs, firing_rates
+
 
 
 def thetaCells(spikes,ep,cell_ids):

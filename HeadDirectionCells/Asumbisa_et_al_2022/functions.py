@@ -177,46 +177,6 @@ def compute_AutoCorrs(spks, ep,hdIdx, binsize = 5, nbins = 400):
     return autocorrs, firing_rates
 
 
-
-#########################################################
-# VARIOUS 3.456246178867965
-
-
-def computeAngularTuningCurves_dat(spikes, angle, ep, nb_bins = 180, frequency = 120.0, bin_size = 100):
-    tmp             = pd.Series(index = angle.index.values, data = np.unwrap(angle.values))    
-    tmp2             = tmp.rolling(window=50,win_type='gaussian',center=True,min_periods=1).mean(std=10.0)    
-    bin_size         = bin_size * 1000
-    time_bins        = np.arange(tmp.index[0], tmp.index[-1]+bin_size, bin_size) # assuming microseconds
-    index             = np.digitize(tmp2.index.values, time_bins)
-    tmp3             = tmp2.groupby(index).mean()
-    tmp3.index         = time_bins[np.unique(index)-1]+bin_size/2
-    tmp3             = nts.Tsd(tmp3)
-    tmp4            = np.diff(tmp3.values)/np.diff(tmp3.as_units('s').index.values)
-    newangle         = nts.Tsd(t = tmp3.index.values, d = tmp3.values%(2*np.pi))
-    velocity         = nts.Tsd(t=tmp3.index.values[1:], d = tmp4)
-    velocity         = velocity.restrict(ep)    
-    velo_spikes     = {}    
-    #for k in spikes: velo_spikes[k]    = velocity.realign(spikes[k].restrict(ep))
-    #bins_velocity    = np.array([velocity.min(), -2*np.pi/3, -np.pi/6, np.pi/6, 2*np.pi/3, velocity.max()+0.001])
-    #idx_velocity     = {k:np.digitize(velo_spikes[k].values, bins_velocity)-1 for k in spikes}
-
-    bins             = np.linspace(0, 2*np.pi, nb_bins)
-    idx             = bins[0:-1]+np.diff(bins)/2
-    tuning_curves     = {i:pd.DataFrame(index = idx, columns = np.arange(len(spikes))) for i in range(3)}    
-
-    for i,j in zip(range(3),range(0,6,2)):
-        for k in spikes:
-            spks             = spikes[k].restrict(ep)            
-            #spks             = spks[idx_velocity[k] == j]
-            angle_spike     = newangle.restrict(ep).realign(spks)
-            spike_count, bin_edges = np.histogram(angle_spike, bins)
-            #tmp             = newangle.loc[velocity.index[np.logical_and(velocity.values>bins_velocity[j], velocity.values<bins_velocity[j+1])]]
-            occupancy, _     = np.histogram(tmp, bins)
-            spike_count     = spike_count/occupancy    
-            tuning_curves[i][k] = spike_count*(1/(bin_size*1e-6))
-
-    return tuning_curves, velocity, bins_velocity
-
 def computeFiringRates(spikes, epochs, tcs,name,hds):
     mean_frate = pd.DataFrame(index = np.arange(len(hds)), columns = name)
     peak_frate= pd.DataFrame(index = np.arange(len(hds)), columns = name)
@@ -245,17 +205,6 @@ def computeVectorLength(spikes,epochs,position, name,hds):
     return rmean
                    
 
-def VectorLength(spikes,epochs,position,hds):
-    rmean=pd.DataFrame(index = hds,columns=[0])  
-    for k in hds:
-        spk = spikes[k]
-        spk = spk.restrict(epochs)
-        angle_spk = position.realign(spk)
-        C = np.sum(np.cos(angle_spk.values))
-        S = np.sum(np.sin(angle_spk.values))
-        Rmean = np.sqrt(C**2  + S** 2) /len(angle_spk)
-        rmean.loc[k,0]=Rmean
-    return rmean
 
 def MutualInfo(spikes,ep,position,hds):
     I=pd.DataFrame(index=hds,columns=[0])
@@ -304,7 +253,6 @@ def computeAngularTuningCurves(spikes, angle, ep,nb_bins = 180, frequency = 120.
 
 
 
-
 def computeInfo(eps,spikes,position, name,hds):
     I=pd.DataFrame(index=np.arange(len(hds)),columns=name)
     for n, ep in zip(name, eps):
@@ -321,64 +269,8 @@ def computeInfo(eps,spikes,position, name,hds):
     return I
 
 
-def computePlaceInfo(spikes, position, ep, nb_bins = 60, frequency = 120.0):
-    Info=pd.DataFrame(index=spikes.keys(),columns=['bits/spk'])
-    position_tsd = position.restrict(ep)
-    xpos = position_tsd.iloc[:,0]
-    ypos = position_tsd.iloc[:,1]
-    xbins = np.linspace(xpos.min(), xpos.max()+1e-6, nb_bins+1)
-    ybins = np.linspace(ypos.min(), ypos.max()+1e-6, nb_bins+1)    
-    for n in spikes:
-        position_spike = position_tsd.realign(spikes[n].restrict(ep))
-        spike_count,_,_ = np.histogram2d(position_spike.iloc[:,1].values, position_spike.iloc[:,0].values, [ybins,xbins])
-        occupancy, _, _ = np.histogram2d(ypos, xpos, [ybins,xbins])
-        mean_spike_count = spike_count/(occupancy+1)
-        place_field = mean_spike_count*frequency    
-        place_fields = pd.DataFrame(index = ybins[0:-1][::-1],columns = xbins[0:-1], data = place_field)
-        occus= occupancy/sum(occupancy)
-        mFR=len(spikes[n].restrict(ep))/ep.tot_length('s')
-        info=occus*(place_fields/mFR)*np.log2(place_fields/mFR)
-        info=np.array(info)
-        info[isnan(info)]=0 
-        Info.loc[n]=sum(info)
-    return Info
-
-
-
    
-#Computes mutual information for a single session--OLD
-def hd_info(tcurve,ep,spikes,position):
-    I=pd.DataFrame(index=spikes.keys(),columns=['Ispk'])
-    for i in spikes.keys():
-        lamda_i=tcurve[i].values
-        #bins=tcurve.index
-        lamda=len(spikes[i].restrict(ep))/ep.tot_length('s')
-        
-        pos=position['ry'].restrict(ep)
-        bins=linspace(0,2*pi,60)
-        occu,a=np.histogram(pos, bins)
-        occu= occu/sum(occu)
-        bits_spk=sum(occu*(lamda_i/lamda)*np.log2(lamda_i/lamda))
-        I.loc[i,'Ispk']=bits_spk
-    return I 
 
-def fisher_information(x, f):
-    """ Compute Fisher Information over the tuning curves
-        x : array of angular position
-        f : firing rate
-        return (angular position, fisher information)
-    """
-    fish = np.zeros(len(f)-1)
-    slopes_ = []
-    tmpf = np.hstack((f[-1],f,f[0:3]))
-    binsize = x[1]-x[0]	
-    tmpx = np.hstack((np.array([x[0]-binsize-(x.min()+(2*np.pi-x.max()))]),x,np.array([x[-1]+i*binsize+(x.min()+(2*np.pi-x.max())) for i in range(1,4)])))		
-    for i in range(len(f)):
-        slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(tmpx[i:i+3], tmpf[i:i+3])
-        slopes_.append(slope)
-    fish = np.power(slopes_, 2)
-    fish = fish/(f+1e-4)
-    return (x, fish)             
         
 def findHDCells_GV(tuning_curves, z = 50, p = 0.0001 , m = 1):
 	"""
@@ -396,66 +288,6 @@ def findHDCells_GV(tuning_curves, z = 50, p = 0.0001 , m = 1):
 
 
 
-
-def findHDCells(tuning_curves,ep,spikes,position,cut_off=0.49):
-    """
-        Peak firing rate larger than 1
-        and Rayleigh test p<0.001 & z > 100
-    """
-    cond1 = pd.DataFrame(tuning_curves.max()>1.0)
-    angle = position.restrict(ep)
-    
-    from pycircstat.tests import rayleigh
-    
-    stat = pd.DataFrame(index = tuning_curves.columns, columns = ['pval', 'z'])
-    for k in tuning_curves:
-        stat.loc[k] = rayleigh(tuning_curves[k].index.values, tuning_curves[k].values)
-        #stat.loc[k]=  rayleigh(position['ry'].restrict(ep).values , position['ry'].realign(spikes[k].restrict(ep)))
-                
-    
-    rMean=pd.DataFrame(index=tuning_curves.columns, columns=['hd_score'])   
-    for k in tuning_curves:  
-        """computes the rayleigh vector length as hdScore. 
-        """
-        spk = spikes[k]
-        spk = spk.restrict(ep)
-        angle_spk = angle.realign(spk)
-        C = np.sum(np.cos(angle_spk.values))
-        S = np.sum(np.sin(angle_spk.values))
-        Rmean = np.sqrt(C**2  + S** 2) /len(angle_spk)
-        rMean.loc[k]=Rmean
-        
-    stat['hd_score']=rMean
-    
-    spatial_corr=stability(ep,spikes,position)
-    stat['stability']=spatial_corr.spatial_corr
-    
-    cond2 = pd.DataFrame(np.logical_and(stat['pval']<0.001,stat['z']>15))
-    cond3 = pd.DataFrame(rMean['hd_score']>=cut_off)
-    cond4= pd.DataFrame(stat.stability>=0.65)
-    '''To Do
-    Add cond 4 and set it to any value greater than 0.4'''
-    #cond4=pd.DataFrame(stat['hd_info'])
-    tokeep=(cond1[0]==True) & (cond2[0]==True) & (cond4['stability']==True) & (cond3['hd_score']==True) #was excluded a lot of obvious HD cells
-    stat['hd_cells']=tokeep
- #tuning_curves have been normalised by occupancy, unlike the rvector
-#Rayleigh z test to test the null hypothesis that there is no sample mean direction  
-    
-    '''I=pd.DataFrame(index=spikes.keys(),columns=['Ispk'])
-    for i in spikes.keys():
-        lamda_i=tuning_curves[i].values
-        bins=tuning_curves.index
-        lamda=len(spikes[i].restrict(ep))/ep.tot_length('s')
-        
-        pos=position.restrict(ep)
-        bins=linspace(0,2*pi,60)
-        occu,a=np.histogram(pos, bins)
-        occu= occu/sum(occu)
-        bits_spk=sum(occu*(lamda_i/lamda)*np.log2(lamda_i/lamda))
-        I.loc[i,'Ispk']=bits_spk
-    stat['hd_info']=I'''
-  
-    return stat
     
 def decodeHD(tuning_curves, spikes, ep,bin_size = 200, px = None):
     """
@@ -479,9 +311,6 @@ def decodeHD(tuning_curves, spikes, ep,bin_size = 200, px = None):
     for i,k in enumerate(tuning_curves.columns):
         spks = spikes[k].restrict(ep).as_units('ms').index.values
         spike_counts[k], _ = np.histogram(spks, bins)
-    
-    print(spike_counts.columns.values)
-    print(tuning_curves.columns.values)
 
     tcurves_array = tuning_curves.values
     spike_counts_array = spike_counts.values
@@ -507,34 +336,6 @@ def decodeHD(tuning_curves, spikes, ep,bin_size = 200, px = None):
 def makeBins(ep, bin_size=200): #the bin size is based on the bin size of the decoder
     bins_=  np.arange(ep.as_units('ms').start.iloc[0], ep.as_units('ms').end.iloc[-1], bin_size)      
     return bins_
-
-
-def computePlaceFields(spikes, position, ep, nb_bins = 100, frequency = 120.0):
-    place_fields = {}
-    occus={}
-    position_tsd = position.restrict(ep)
-    xpos = position_tsd.iloc[:,0]
-    ypos = position_tsd.iloc[:,1]
-    xbins = np.linspace(xpos.min(), xpos.max()+1e-6, nb_bins+1)
-    ybins = np.linspace(ypos.min(), ypos.max()+1e-6, nb_bins+1)    
-    for n in spikes:
-        position_spike = position_tsd.realign(spikes[n].restrict(ep))
-        spike_count,_,_ = np.histogram2d(position_spike.iloc[:,1].values, position_spike.iloc[:,0].values, [ybins,xbins])
-        occupancy, _, _ = np.histogram2d(ypos, xpos, [ybins,xbins])
-        mean_spike_count = spike_count/(occupancy+1)
-        place_field = mean_spike_count*frequency    
-        place_fields[n] = pd.DataFrame(index = ybins[0:-1][::-1],columns = xbins[0:-1], data = place_field)
-        occus[n]= occupancy/sum(occupancy)
-    extent = (xbins[0], xbins[-1], ybins[0], ybins[-1]) # USEFUL FOR MATPLOTLIB
-    return place_fields, extent
-
-def computeOccupancy(position_tsd, nb_bins = 100):
-    xpos = position_tsd['x']
-    ypos = position_tsd['z']   
-    xbins = np.linspace(xpos.min(), xpos.max()+1e-6, nb_bins+1)
-    ybins = np.linspace(ypos.min(), ypos.max()+1e-6, nb_bins+1)
-    occupancy, _, _ = np.histogram2d(ypos, xpos, [ybins,xbins])
-    return occupancy
 
 
 def computeAngularVelocity(angle, ep, bin_size = 400000):
@@ -575,7 +376,7 @@ def computeAngularVelocityTuningCurves(spikes,hds, angle, ep, nb_bins = 20, bin_
 
     return velo_curves
 
-#plot(vel.loc[-np.pi:np.pi])
+
 
 def slidingWinEp(ep,duration):
     t = np.arange(ep['start'].loc[0], ep['end'].loc[0], duration) #2mins
@@ -621,7 +422,7 @@ def circStats_sw(ep,spikes,position,dur,hds):
     return c_mean,c_var
 
 
-def PFD_Rates_trim(ep,spikes,position,dur): #duration must be in microsecs
+def PFD_Rates(ep,spikes,position,dur): #duration must be in microsecs
     sw_ep=slidingWinEp(ep,dur)
        
     max_tcurves=pd.DataFrame(index=range(len(sw_ep)), columns=spikes.keys())
@@ -634,24 +435,6 @@ def PFD_Rates_trim(ep,spikes,position,dur): #duration must be in microsecs
         max_tcurves.loc[i]=tcurve.idxmax(axis=0)
     return max_tcurves, max_pRate   
 
-
-
-
-def PFD_Rates(ep,spikes,position,dur): #duration must be in microsecs
-    '''computes the firing rates and corresponding angle'''
-    sw_ep=slidingWinEp(ep,dur)       
-    max_tcurves=pd.DataFrame(index=range(len(sw_ep)), columns=spikes.keys())
-    max_pRate=pd.DataFrame(index=range(len(sw_ep)), columns=spikes.keys())
-    for i in range(len(sw_ep)):
-        sw=sw_ep.loc[i]
-        sw=nts.IntervalSet(sw.start,sw.end)
-        tcurve=computeFrateAng(spikes,position,sw,60)
-        for k in spikes.keys():
-            pFD=tcurve[k].idxmax(axis=0)
-            pFR=tcurve[k].max()
-            max_pRate.iloc[i,k]=pFR
-            max_tcurves.iloc[i,k]=pFD
-    return max_tcurves, max_pRate
 
 def smallestSignedAngleBetween(x, y):
     "takes an array of x and y and returns the smallest diff in ang"
@@ -675,10 +458,6 @@ def largestSignedAngleBetween(x, y):
             dat.iloc[i,0]=-a
         else:
             dat.iloc[i,0]=b        
-    
-    # a = (x - y) % np.pi #if you want the largest difference, set it to modulo 2*np.pi for this and next line
-    # b = (y - x) %  np.pi
-    # -a if a < b else b
     return dat
 
 
@@ -696,16 +475,6 @@ def PFD(tcurve, ep,spikes): #duration must be in microsecs
         
     return  max_tcurves
 
-
-
-      
-def circular_stats(ep,spikes,position):
-    circ_stats=pd.DataFrame(index=spikes.keys(), columns=['circ_mean','circ_var'])
-    for i in spikes.keys():
-        circ_stats.loc[i,'circ_mean']=circmean(position['ry'].realign(spikes[i].restrict(ep)))
-        circ_stats.loc[i,'circ_var']=circvar(position['ry'].realign(spikes[i].restrict(ep)))
-    return circ_stats
-#astropy.stats.circstats.vonmisesmle--modify to include kappa!
 
 def computeCircularStats(epochs,spikes,position, names,hds):
     circ_mean=pd.DataFrame(index=hds, columns=names)
@@ -728,71 +497,6 @@ def shuffleByIntervalSpikes(spikes, epochs):
 			isi.append(tmp)
 		shuffled[n] = nts.Ts(t = np.cumsum(np.hstack(isi)) + epochs.loc[0,'start'])
 	return shuffled
-
-
-
-
-def computeStability_KA(epochs,spikes,position,name,hds): #computes spatial corr for several datafiles
-    r=pd.DataFrame(index=np.arange(len(hds)), columns=name)
-    for n, ep in zip(name,epochs): 
-        #duration must be in microsecs  
-        ep1_start=ep.start[0]; ep1_end=ep.start[0]+(diff(ep)[0][0]/2)
-        
-        ep2_start=ep1_end; ep2_end=ep.end[0]
-        
-        ep1=nts.IntervalSet(ep1_start,ep1_end)
-        ep2=nts.IntervalSet(ep2_start,ep2_end)
-    
-        tcurve1=computeAngularTuningCurves(spikes,position,ep1,60)
-        tcurve2=computeAngularTuningCurves(spikes,position,ep2,60)
-        for i,k in enumerate(hds):
-            tc=pd.concat((tcurve1[k],tcurve2[k]),axis=1)
-            tc = tc.dropna(how = 'all')            
-            tc=tc[(tc.iloc[:,0]>0.0) & (tc.iloc[:,1]>=0.0)]
-
-            if tc.isnull().values.any():
-                pass
-            else:
-                r.loc[i,n]=scipy.stats.pearsonr(tc.iloc[:,0],tc.iloc[:,1])[0]
-    return r
-
-
-
-        
-def corr_matrix(ep,spikes,position,hds):
-    """
-    sort cells according to their pref. fir direction first
-    """
-    dur= diff(ep)/2
-     #duration must be in microsecs
-    ep=slidingWinEp(ep,dur)  
-     
-    ep1_start=ep.start[0]; ep1_end=ep.start[0]+(diff(ep)[0][0]/2)
-    
-    ep2_start=ep1_end; ep2_end=ep.end[0]
-    
-    ep1=nts.IntervalSet(ep1_start,ep1_end)
-    ep2=nts.IntervalSet(ep2_start,ep2_end)
-    
-    tcurve1=computeAngularTuningCurves(spikes,position,ep1,60)
-    pfds=[scipy.stats.circmean(tcurve1[k]) for k in hds] 
-    pfds_pair=pd.DataFrame(array(hds),array(pfds))
-    pfd_sort=pfds_pair.sort_index(0)
-    pfd_sort=list(pfd_sort.values.flatten())
-
-    
-    tcurve2=computeAngularTuningCurves(spikes,position,ep2,60)
-    
-    corr_mat=pd.DataFrame(index=np.arange(len(hds)),columns=np.arange(len(hds)))
-
-    for v,j in enumerate(pfd_sort):
-        for vv, k in enumerate(pfd_sort):
-            corr_mat.loc[v,vv]=scipy.stats.pearsonr(tcurve1[j].values,tcurve2[k].values)[0]              
-    return corr_mat.astype('float')
-
-
-
-
 
 
 def centerTuningCurves(tcurve):
@@ -838,38 +542,6 @@ def computeWidth(epochs,spikes, names,tcurves,hds):
                 tc_width.loc[i,n]=NaN
     return tc_width
 
-
-
-
-def tc_width(tcurves,spikes):    
-    'computes the width of the tuning curve of all cells'
-    
-    tc_width=pd.DataFrame(index=([0]),columns=spikes.keys())
-    
-    for i in tcurves:
-        try:
-            curves=centerTuningCurves(tcurves)
-            tcurve=tcurves[i]
-            max_fr=tcurve.max(axis=0)
-            min_fr=tcurve.min(axis=0)
-            tc_half_w=(max_fr - min_fr)/2 + min_fr
-        
-            tc_max_ang=tcurve.idxmax(axis=0)
-            
-            ls_tc=tcurve[tcurve.index < tc_max_ang]
-            ls_fxn=scipy.interpolate.interp1d(ls_tc.values,ls_tc.index ,assume_sorted = False)
-            ls=ls_fxn(tc_half_w)
-    
-            rs_tc=tcurve[tcurve.index > tc_max_ang]
-            rs_fxn=scipy.interpolate.interp1d(rs_tc.values,rs_tc.index ,assume_sorted = False)
-            rs=rs_fxn(tc_half_w)
-            
-            width=abs(ls)+rs
-            
-            tc_width.loc[0,i]=width
-        except:
-            tc_width.loc[0,i]=NaN
-    return tc_width.T
 
 
 def full_ang(ep,position):
@@ -974,98 +646,6 @@ def makeRingManifold(spikes, ep, angle, hds,neighbors=50,bin_size = 200):
 
 
 
-def all_frate_maps(spikes,position,ep,hds):
-    
-    tms={}
-    GF, ext = computePlaceFields(spikes, position[['x', 'z']], ep, 50)
-    for i,k in enumerate(hds):
-       tms[i] = gaussian_filter(GF[k].values,sigma = 2)
-    return tms
-#Sanity Checks
-#scatter(x[r<cyl_c],y[r<cyl_c],color='r',s=2,zorder=4)
-#scatter(x[r>cyl_c],y[r>cyl_c])
-#plot(p)
-
-##################################
-##MACHINE LEARNING FUNCTIONS
-#################################
-def randforestAccuracy(accuracy_mat):
-    '''computes the percent accuracy based on a pandas crosstab mat of predictions'''
-    val=[]
-
-    if isinstance(accuracy_mat, pd.DataFrame)!=True:
-        accuracy_mat=pd.DataFrame(accuracy_mat)
-    for i in range(len(accuracy_mat)):
-        r_pred=accuracy_mat.iloc[i,i]
-        val.append(r_pred)    
-    return  float(('%.1f' % (sum(val)/accuracy_mat.values.sum()*100)))
-
-#####################################
-# FIGURE FUNCTIONS
-#####################################
-def occu_heatmp(ep,position,_bins=50, threshold=0.13):   
-    occu=computeOccupancy(position.restrict(ep),_bins)
-    occu=gaussian_filter(occu,sigma=0.7)
-    for i,z in enumerate(occu):
-        for x,y in enumerate(occu):
-            if occu[i][x] <=threshold:
-                occu[i][x]=NaN
-    fig, ax = plt.subplots()
-    q=ax.imshow(occu,cmap='jet',interpolation = 'bilinear')
-    cbar=fig.colorbar(q,orientation='vertical')
-    cticks=cbar.ax.get_xticks()
-    cbar.set_ticks([])
-    #cbar.set_ticklabels(['min','max'])
-    #cbar.ax.set_xlabel('occu')
-    ax.axis('off')
-    #make_axes(parents, location=None, orientation=None, fraction=0.15,)       
-    #c=fig.colorbar(q, ticks=[occu.min(), occu.max()])#cax = fig.add_axes([0.78, 0.5, 0.03, 0.38]))
-    #c.ax.set_xticklabels(['Low', 'High'])   
-    plt.gca().invert_yaxis()
-    return occu,fig
-
-def path_spk_plt(ep,spikes,position):
-    
-    sz=len(spikes.keys())/3
-    fig = figure(figsize = (15,16))
-    fig.suptitle('Spikes + Path Plot',size=30)
-    for i in spikes:
-        ax=subplot(10,3,i+1)
-        scatter(position['x'].realign(spikes[i].restrict(ep)),position['z'].realign(spikes[i].restrict(ep)),s=5,c='magenta',label=str(i))
-        legend()
-        plot(position['x'].restrict(ep),position['z'].restrict(ep),color='darkgrey', alpha=0.5)  
-    return fig,ax
-
-#ANIMATE TRAJECTORY IN XY
-
-
-'''
-px=position['x'].restrict(ep).as_units('s')
-py=position['z'].restrict(ep).as_units('s')
-
-nbins=np.linspace(px.index[0],px.index[-1],12000)
-dig=np.digitize(px.index.values,nbins)
-
-px=pd.DataFrame(px.values).groupby(dig).mean()
-py=pd.DataFrame(py.values).groupby(dig).mean()
-
-
-x = px.values.flatten()
-y = py.values.flatten()
-fig, ax = plt.subplots()
-line, = ax.plot(x, y, color='k',linewidth=2,alpha=0.5)
-
-def update(num, x, y, line):
-    line.set_data(x[:num], y[:num])
-    #line.axes.axis([0, 10, 0, 1])
-    return line
-
-ani = animation.FuncAnimation(fig, update, len(x), fargs=[x, y, line],
-                              interval=0.0001, blit=False, repeat=False)
-'''
-
-
-
 def bkgrid ():
     '''Helper fxn for making grids in matplotlib during figure making'''
     plt.gcf()
@@ -1082,21 +662,6 @@ def bkgrid ():
     ax.set_yticklabels(fig_lim,size=6.5,color='r')
     return ax
 
-
-
-
-def path_plot(eps,position):
-    #fig=figure(figsize=(15,16))
-    fig=figure()
-    for i in range(len(eps)):
-        if len(eps)==1:
-            ax=subplot()
-        else:    
-            ax=subplot(1,len(eps),i+1)
-        ep=eps.iloc[i]
-        ep=nts.IntervalSet(ep[0],ep[1])
-        plot(position['x'].restrict(ep),position['z'].restrict(ep),color='red',label=str(i), alpha=0.5) 
-        legend()
 
 def remove_polarAx(ax, xtcklabels=False ):
     #ax.set_yticks([])
@@ -1307,8 +872,6 @@ def fullAngDrift2(epoch,spikes,position,hds,eps):
     pfd_smooth=pd.DataFrame([gaussian_filter(pfd1[:,i].astype('float'),sigma=1.5) for i in range(pfd1.shape[1])]).T
     pfd_smooth.columns=hds    
     return  pfd_smooth,eps
-
-
 
 
 def computeAngularVelocity2(angle, time_bins, ep):

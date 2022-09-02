@@ -25,10 +25,10 @@ data_directory   = r'C:\Users\kasum\Dropbox\ADn_Project' #win
 info             = pd.read_excel(os.path.join(data_directory,'data_sheet.xlsx')) #directory to file with all exp data info
 
 exp='standard'
-cond1='cueA_light'
-cond2='cueB_light'
+cond1='cueA'
+cond2='cueB'
 
-strains=['wt','rd1','gnat'] #you can equally specify the mouse you want to look at
+strains=['wt'] #you can equally specify the mouse you want to look at
 
 #index for all the rows that meet cond1 and 2
 for strain in strains:
@@ -118,6 +118,3 @@ for strain in strains:
         rd1=[ cue_ctrl,gain]
     elif strain=='gnat':
         gn=[ cue_ctrl,gain]
-
-    
-#np.save(r'C:\Users\kasum\Dropbox\ADn_Project\ADn_Figs\fig1_flrRots3_Gain_ver3.npy',[wt,rd,gn])

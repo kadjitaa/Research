@@ -5,10 +5,6 @@ Created on Tue Apr 26 20:57:22 2022
 @author: kasum
 """
 from sklearn.datasets import load_boston
-boston = load_boston()
-
-
-
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import AdaBoostClassifier
@@ -134,16 +130,3 @@ print(cm)
 f_score=f1_score(y_test,y_pred)*100
 print(f_score)
 
-
-
-    
-#     import pickle
-#     file_name = r"C:\Users\kasum\Dropbox\ADn_Project\ADn_Figs\Review\models\XGB_model_STANDARDL_minusPairedLD_seed" +str(ii)+ ".pkl"
-    
-#     # save
-#     pickle.dump(model, open(file_name, "wb"))
-    
-#     modeldata={'cm':cm, 'a_score':accuracy,'f_score':f_score,'notes': 'trained on standard light_all_strains minus standard paird Light-Dark'}
-#     np.save(r"C:\Users\kasum\Dropbox\ADn_Project\ADn_Figs\Review\models\XGB_model_STANDARDL_minusPairedLD_seed" + str(ii)+".npy",modeldata)
-
-# # [4]--96.72

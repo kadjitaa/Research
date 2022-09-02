@@ -265,28 +265,34 @@ def makePositions(path, file_order, episodes, n_channels,channel_optitrack, name
             print("Exiting ...")
             sys.exit()
         else:
-            print(n_channels)
+            # print(n_channels)
             ttl = loadTTLPulse(analogin_file, n_channels,channel_optitrack)
-        print(i, len(position)/120/60)
+        # print(i, len(position)/120/60)
 
         length = np.minimum(len(ttl), len(position))
         ttl = ttl.iloc[0:length]
         position = position.iloc[0:length]
-        print(i, len(position)/120/60)
+        # print(i, len(position)/120/60)
         time_offset = wake_ep.as_units('s').iloc[i,0] + ttl.index[0]
         position.index += time_offset
         wake_ep.iloc[i,0] = np.int64(np.maximum(wake_ep.as_units('s').iloc[i,0], position.index[0])*1e6)
         wake_ep.iloc[i,1] = np.int64(np.minimum(wake_ep.as_units('s').iloc[i,1], position.index[-1])*1e6)
-        print(i, len(position)/120/60)
+        # print(i, len(position)/120/60)
         frames.append(position)
     
     position = pd.concat(frames)
-    #position = nts.TsdFrame(t = position.index.values, d = position.values, time_units = 's', columns = names)
-    position.columns = names
+    # print(position.columns)
+    # position = nts.TsdFrame(t = position.index.values, d = position.values, time_units = 's', columns = names)
+    try:
+        position.columns= names
+    except:
+        position=position.iloc[:,1:]
+        position.columns=names
+        
     position[['ry', 'rx', 'rz']] *= (np.pi/180)
     position[['ry', 'rx', 'rz']] += 2*np.pi
     position[['ry', 'rx', 'rz']] %= 2*np.pi
-    print(len(position)/120/60)
+    # print(len(position)/120/60)
     if update_wake_epoch:
         store = pd.HDFStore(file_epoch, 'a')
         store['wake'] = pd.DataFrame(wake_ep)
@@ -314,7 +320,7 @@ def loadEpoch(path, epoch, episodes = None):
 	"""			
 	if not os.path.exists(path): # Check for path
 		print("The path "+path+" doesn't exist; Exiting ...")
-		sys.exit()		
+		sys.exit()
 	filepath 	= os.path.join(path, 'Analysis')
 	if os.path.exists(filepath): # Check for path/Analysis/	
 		listdir		= os.listdir(filepath)
@@ -668,7 +674,7 @@ def makeHFEpochs(data_directory,name, n_channels=4, fs=20000):
         data = np.fromfile(f, np.uint16).reshape((n_samples, n_channels))  #[] you can add this to tell if you this contains the ttls for the stims. the final input corresponds to thhe total number of open ch 
         
     #For extracting the different conditions in the Head Fixed (hf) condition  
-    #data = data.flatten().astype(np.int32) necessary if you have only 1 column 
+    data = data.flatten().astype(np.int32) #necessary if you have only 1 column 
     channel1=data[:,0].astype(np.int32) #this extracts ttl from first channel 1 (leftwards)
     peaks1, _ = scipy.signal.find_peaks(np.diff(channel1), height = 40000)
     trough1, _ = scipy.signal.find_peaks(np.diff(channel1)*-1, height = 40000)
