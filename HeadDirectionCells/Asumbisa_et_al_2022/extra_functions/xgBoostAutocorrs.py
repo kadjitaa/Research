@@ -4,27 +4,16 @@ Created on Tue Apr 26 20:57:22 2022
 
 @author: kasum
 """
-from sklearn.datasets import load_boston
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.preprocessing import LabelEncoder
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score
 from sklearn.metrics import accuracy_score
-from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
-from sklearn import preprocessing
-from sklearn.cluster import KMeans,MiniBatchKMeans
-import umap
-from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import DBSCAN
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 
 
 data2=np.load(r'C:\Users\kasum\Dropbox\ADn_Project\ADn_Figs\AutoCorrs_StandardL_ver2.npy',allow_pickle=True).item()

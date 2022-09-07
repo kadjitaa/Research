@@ -206,21 +206,6 @@ def computeVectorLength(spikes,epochs,position, name,hds):
                    
 
 
-def MutualInfo(spikes,ep,position,hds):
-    I=pd.DataFrame(index=hds,columns=[0])
-    for k in hds: 
-        lamda_i=computeAngularTuningCurves(spikes,position,ep,60)[k].values
-        lamda=len(spikes[k].restrict(ep))/ep.tot_length('s') 
-        pos=position.restrict(ep)
-        bins=linspace(0,2*pi,60)
-        occu,a=np.histogram(pos, bins)
-        occu= occu/sum(occu)
-        bits_spk=sum(occu*(lamda_i/lamda)*np.log2(lamda_i/lamda))
-        I.loc[k,0]=bits_spk
-    return I      
-
-
-
 def computeAngularTuningCurves(spikes, angle, ep,nb_bins = 180, frequency = 120.0):
 
     bins             = np.linspace(0, 2*np.pi, nb_bins)
@@ -267,25 +252,6 @@ def computeInfo(eps,spikes,position, name,hds):
             bits_spk=sum(occu*(lamda_i/lamda)*np.log2(lamda_i/lamda))
             I.loc[i,n]=bits_spk
     return I
-
-
-   
-
-        
-def findHDCells_GV(tuning_curves, z = 50, p = 0.0001 , m = 1):
-	"""
-		Peak firing rate larger than 1
-		and Rayleigh test p<0.001 & z > 100
-	"""
-	cond1 = tuning_curves.max()>m
-	from pycircstat.tests import rayleigh
-	stat = pd.DataFrame(index = tuning_curves.columns, columns = ['pval', 'z'])
-	for k in tuning_curves:
-		stat.loc[k] = rayleigh(tuning_curves[k].index.values, tuning_curves[k].values)
-	cond2 = np.logical_and(stat['pval']<p,stat['z']>z)
-	tokeep = stat.index.values[np.where(np.logical_and(cond1, cond2))[0]]
-	return tokeep, stat
-
 
 
     
@@ -435,30 +401,6 @@ def PFD_Rates(ep,spikes,position,dur): #duration must be in microsecs
         max_tcurves.loc[i]=tcurve.idxmax(axis=0)
     return max_tcurves, max_pRate   
 
-
-def smallestSignedAngleBetween(x, y):
-    "takes an array of x and y and returns the smallest diff in ang"
-    dat=pd.DataFrame(index=np.arange(len(x)),columns=['delta'])
-    for i in range(len(x)):
-        a=(x[i]-y[i])%np.pi
-        b=(y[i]-x[i])%np.pi
-        if a<b:
-            dat.iloc[i,0]=-a
-        else:
-            dat.iloc[i,0]=b
-    return dat
-            
-def largestSignedAngleBetween(x, y):
-    "takes an array of x and y and returns the smallest diff in ang"
-    dat=pd.DataFrame(index=np.arange(len(x)),columns=['delta'])
-    for i in range(len(x)):
-        a=(x[i]-y[i])%np.pi*2
-        b=(y[i]-x[i])%np.pi*2
-        if a<b:
-            dat.iloc[i,0]=-a
-        else:
-            dat.iloc[i,0]=b        
-    return dat
 
 
 def PFD(tcurve, ep,spikes): #duration must be in microsecs

@@ -9,14 +9,9 @@ Created on Sat Jan 29 23:04:53 2022
 import numpy as np
 import pandas as pd
 import neuroseries as nts
-from pylab import *
 from wrappers import *
 from functions import *
-import sys
 from pycircstat.descriptive import mean as circmean
-import _pickle as cPickle
-from sklearn import datasets, linear_model
-import astropy
 ###############################################################################
 ###Setting Directory and Params
 ###############################################################################
@@ -38,7 +33,6 @@ for strain in strains:
             if cond1 in list(info.iloc[i,:].values) and cond2 in list(info.iloc[i,:].values):
                 idx2.append(i)
                 
-    print(idx2)
 #################################################################################
 ###Preselect Rows of Interest for group analysis
 #################################################################################
