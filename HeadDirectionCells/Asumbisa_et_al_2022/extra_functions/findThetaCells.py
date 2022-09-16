@@ -2,7 +2,7 @@
 """
 Created on Thu Mar  3 22:09:31 2022
 
-@author: kasum
+@author: Asumbisa
 """
 import numpy as np
 import pandas as pd
@@ -40,23 +40,20 @@ def thetaCells(spikes,ep,cell_ids):
     '''
     Parameters
     ----------
-    spikes : TYPE
-        DESCRIPTION.
-    ep : TYPE
+    spikes : dict of spikes
+    ep : nts.IntervalSet
         The epoch/session of interest.
     cell_ids : list or array
         The cells you want to analyse (if all cells, set cell_ids = spikes.keys().
-    nbins : TYPE, optional
-        DESCRIPTION. The default is 200.
+    nbins : int, optional
+        Default is 200.
 
     Returns
     -------
-    theta_mod : TYPE
-        DESCRIPTION.
+    theta_mod : list of theta modulated cells
     '''
     auto,_=compute_AutoCorrs(spikes,ep,cell_ids,nbins=200)
-    
-     
+ 
     theta_mod=[]
     for xx,i in enumerate(auto.columns)  :
         N = 200

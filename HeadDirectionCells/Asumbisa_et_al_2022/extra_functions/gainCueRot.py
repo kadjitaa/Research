@@ -2,7 +2,7 @@
 """
 Created on Sat Jan 29 23:04:53 2022
 
-@author: kasum
+@author: Asumbisa
 """
 
 
@@ -64,8 +64,7 @@ for strain in strains:
         episodes = info.filter(like='T').loc[s]
         events  = list(np.where((episodes == cond1) | (episodes== cond2))[0].astype('str'))
         
-        spikes, shank                       = loadSpikeData(path)
-        #n_channels, fs, shank_to_channel   = loadXML(path)
+        spikes                              = loadSpikeData(path)
         position                            = loadPosition(path, events, episodes)
         wake_ep                             = loadEpoch(path, 'wake', episodes)
         
@@ -74,15 +73,10 @@ for strain in strains:
             
         tcurv_1 = computeAngularTuningCurves(spikes,position['ry'],ep1,60)
         tcurv_2 = computeAngularTuningCurves(spikes,position['ry'],ep2,60)
-     
-        hds1,_=findHDCells_GV(tcurv_1)
-        hds2,_=findHDCells_GV(tcurv_2) 
-        hds=list(set(hds1) or set(hds2))
         
-        circ_mean,_ = computeCircularStats([ep1,ep2],spikes,position['ry'],[cond1,cond2],hds)   
+        circ_mean,_ = computeCircularStats([ep1,ep2],spikes,position['ry'],[cond1,cond2],hdCells)   #hdCells: list of HD cells
 
         cond3=deg2rad(info.rot_ang[s]) # the absolute change in cue ang
-        #cond4=info.rot_dir[s]  #CW or CCW cue rot
         gtype=info.genotype[s]
         
         h1=[]##control
@@ -91,7 +85,7 @@ for strain in strains:
             a=circ_mean.iloc[i,0]
             b=circ_mean.iloc[i,1]
 
-        #compute the shortest distance between the 2 angles
+        #compute the distance between the 2 angles
             distance = (b - a) % (2*pi) 
             if distance < - np.pi:
                 distance += (2*pi);

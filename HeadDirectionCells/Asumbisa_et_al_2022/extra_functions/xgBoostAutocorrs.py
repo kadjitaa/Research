@@ -2,7 +2,7 @@
 """
 Created on Tue Apr 26 20:57:22 2022
 
-@author: kasum
+@author: Asumbisa
 """
 import pandas as pd
 import numpy as np
@@ -16,7 +16,7 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import accuracy_score
 
 
-data2=np.load(r'C:\Users\kasum\Dropbox\ADn_Project\ADn_Figs\AutoCorrs_StandardL_ver2.npy',allow_pickle=True).item()
+data2=np.load(r'C:\Users\kasum\Dropbox\ADn_Project\ADn_Figs\AutoCorrs_StandardL_Sessions.npy',allow_pickle=True).item()
 
 wake1=data2['data'][0]
 wake2=data2['data'][1]
@@ -119,3 +119,4 @@ print(cm)
 f_score=f1_score(y_test,y_pred)*100
 print(f_score)
 
+#To do: Jupyter walkthrough notebook

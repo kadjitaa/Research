@@ -2,7 +2,7 @@
 """
 Created on Thu Sep  1 17:36:19 2022
 
-@author: kasum
+@author: Asumbisa
 """
 from wrappers import *
 from functions import *
@@ -31,8 +31,8 @@ events=[i for i,x in enumerate(episodes) if x!='sleep']
 #Extract spikes, position data and wake epochs
 n_analogin_channels = 2  #number of analogin channels open
 channel_optitrack=1 #index of TTL channel
-spikes,shank= loadSpikeData(data_directory) #loads spikes, and probe shank index
-n_channels, fs, shank_to_channel = loadXML(data_directory)  #shank to channel 
+spikes= loadSpikeData(data_directory) #loads spikes
+n_channels, fs = loadXML(data_directory)  #channel mappings 
 position= loadPosition(data_directory,events,episodes,n_analogin_channels,channel_optitrack) #loads position
 wake_ep=loadEpoch(data_directory,'wake',episodes) #loads time intervals for wake trial epochs
 
@@ -47,5 +47,4 @@ for i in range(len(events)):
     plt.suptitle('Trial '+ str(i+1))
     for x in spikes.keys():
         subplot(4,cols,1+x, projection='polar')
-        plot(tc[x],label=str(x))
-    legend()
+        plot(tc[x])

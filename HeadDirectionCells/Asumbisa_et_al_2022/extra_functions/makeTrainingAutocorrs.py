@@ -2,7 +2,7 @@
 """
 Created on Sun Jun 26 16:01:11 2022
 
-@author: kasum
+@author: Asumbisa
 """
 
 import pandas as pd
@@ -33,8 +33,7 @@ for j,strain in enumerate(strains):
         if np.any(info.iloc[i,:].str.contains(exp)) and np.any(info.iloc[i,:].str.contains(strain)) : #:
             if cond1 in (info.iloc[i,:].values):
                 idx2.append(i) 
-    print(idx2)    
-    
+                
     for x,s in enumerate(idx2):
         path=info.dir[s].replace('\\',"/")
         print(str(x+1)+'/'+str(len(idx2)))
@@ -53,11 +52,10 @@ for j,strain in enumerate(strains):
             events=np.where(episodes.values==cond1)[0][0]
 
           
-        spikes, shank                       = loadSpikeData(path)
-        n_channels, fs, shank_to_channel   = loadXML(path)
+        spikes                              = loadSpikeData(path)
+        n_channels, fs                      = loadXML(path)
         position                            = loadPosition(path, events, episodes)
         wake_ep                             = loadEpoch(path, 'wake', episodes)
-        #sleep_ep                            =loadEpoch(path, 'sleep', episodes)
         ep1=nts.IntervalSet(start=wake_ep.loc[events,'start'], end =wake_ep.loc[events,'start']+3e+8)
         ep2=nts.IntervalSet(start=wake_ep.loc[events,'start']+3e+8, end =wake_ep.loc[events,'start']+6e+8)
         

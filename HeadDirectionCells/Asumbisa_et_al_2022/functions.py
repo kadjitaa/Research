@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Mar  7 15:41:03 2019
+
+@authors: Asumbisa & Viejo
 """
 
 import numpy as np

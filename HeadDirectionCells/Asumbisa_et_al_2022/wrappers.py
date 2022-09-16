@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Apr  9 17:34:07 2019
+Original in Matlab by Peyrache et al.
+Migrated to Python by Viejo
 
-@author: kasum
+@author: Asumbisa- minor custom edits specific to project 
 """
 import numpy as np
 import sys,os
@@ -118,7 +120,7 @@ def loadSpikeData(path, index=None, fs = 20000):
 
     shank = spikes.columns.get_level_values(0).values[:,np.newaxis].flatten()
 
-    return toreturn, shank
+    return toreturn
 
 def loadXML(path):
 	"""
@@ -159,7 +161,7 @@ def loadXML(path):
 	groups 		= xmldoc.getElementsByTagName('anatomicalDescription')[0].getElementsByTagName('channelGroups')[0].getElementsByTagName('group')
 	for i in range(len(groups)):
 		shank_to_channel[i] = np.sort([int(child.firstChild.data) for child in groups[i].getElementsByTagName('channel')])
-	return int(nChannels), int(fs), shank_to_channel
+	return int(nChannels), int(fs)
 
 def makeEpochs(path, order, file = None, start=None, end = None, time_units = 's'):
 	"""
